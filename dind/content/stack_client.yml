@@ -1,0 +1,12 @@
+version: "3"
+services:
+    routing:
+        image: 172.17.0.1:5000/babeld #dm4tze/babeld/dev
+        privileged: true
+        network_mode: "host"
+        container_name: babeld
+        restart: unless-stopped
+        
+volumes:
+    dbdata:
+

@@ -1,0 +1,26 @@
+version: "3"
+services:
+    routing:
+        image: 172.17.0.1:5000/babeld #dm4tze/babeld/dev
+        privileged: true
+        network_mode: "host"
+        container_name: babeld
+        restart: unless-stopped
+        
+    tracker:
+        image: 172.17.0.1:5000/opentracker-docker
+        container_name: opentracker
+        network_mode: "host"
+        ports:
+            - 6969:6969 #Torrent Port TCP
+            - 6969:6969/udp #Torrent Port UDP
+        #volumes: 
+            #-etc/opentracker-docker/:etc/opentracker-docker
+            #- opentracker-docker/opentracker.conf:opentracker-docker/opentracker.conf
+            #- opentracker-docker/whitelist.txt:opentracker-docker/whitelist.conf
+            #- opentracker-docker/blacklist.txt:opentracker-docker/blacklist.conf
+        restart: unless-stopped
+
+volumes:
+    dbdata:
+
