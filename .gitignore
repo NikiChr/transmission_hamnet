@@ -1,2 +1,7 @@
 measurements/
 interfaces/
+time/
+results/
+hamnet*
+tmp*
+new*

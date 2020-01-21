@@ -82,13 +82,13 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
             subprocess.call(["docker exec mn.%s sh -c 'iptables -Z'" % node ],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             bar_restart.next()
 
-        print ''
+        #print ''
         check.check()
         while check.repeat == True:
             check.check()
 
         bar_restart.finish()
-        print ('%s deleted on every host\n' % image)
+        print ('%s deleted on every host' % image)
 
 
 
@@ -96,7 +96,7 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
         #bar2 = IncrementalBar('Prepare seeder(s)', max = len(set.seeder))
         for node in set.seeder:
             if iteration == 0:
-                subprocess.call(['docker exec -it mn.%s docker pull %s' %(node, image)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
+                subprocess.call(['docker exec mn.%s docker pull %s' %(node, image)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             subprocess.call(['docker exec mn.%s docker save -o downloads/%s%s.tar %s' %(node, image, torrentsNr, image)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             subprocess.call(["'docker exec mn.%s sh -c 'iptables -Z'" % node ],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 
@@ -123,6 +123,7 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
 
 
         #Start download
+        print datetime.now()
         sum = 0
         bar_download = IncrementalBar('Waiting for download(s)', max = len(set.name))
         for node in set.name:
@@ -136,9 +137,9 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
         if outage == True:
             print ('\nWaiting %s seconds for outage...' % oTime)
             time.sleep(int(oTime))
-            for i in range(int(oNr)):
-                print set.servers[i]
-                subprocess.call(['docker exec mn.%s docker stop opentracker &' % (set.servers[i])],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
+            for j in range(1,int(oNr)+1):
+                print set.servers[j]
+                subprocess.call(['docker exec mn.%s docker stop opentracker &' % (set.servers[-j])],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 
         while sum < len(set.name):
             time.sleep(120)
@@ -162,6 +163,7 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
         #time.sleep(1)
         bar_download.finish()
         print 'Download(s) successful'
+        print 'Grabbing data after download(s)'
         for node in set.name:
             subprocess.call(["docker exec mn.%s sh -c 'iptables -L INPUT -n -v -x > tmp_IN.txt'" % node ],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             subprocess.call(['docker cp mn.%s:tmp_IN.txt measurements/%s/%s/%s/traffic/%s_IN.txt' % (node, currentInstance, currentTest, (iteration + 1), node)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
@@ -175,6 +177,7 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
         #     for i in range(int(oNr)):
         #         subprocess.call(['docker exec mn.%s docker start opentracker' % (set.servers[i])],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 
+    subprocess.call(['docker cp mn.%s:downloads/%s%s.tar measurements/%s/%s/results/%s%s.tar' % (set.seeder[0], image, torrentsNr, currentInstance, currentTest, image, torrentsNr)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
     set.measureTime(image, False, currentInstance, currentTest, iterations, torrentsNr)
     set.measureTraffic(image, False, currentInstance, currentTest, iterations)
 
@@ -182,7 +185,7 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
     doc.write('Server:%s\nHosts:%s\nSeeders:%s\nImage:%s\nServer outage:%s\nOutage number:%s\nOutage start:%s' % (str(len(set.servers)), str(len(set.name)), str(len(set.seeder)), image, outage, oNr, oTime))
     doc.close()
 
-
+    set.imageTime(image, '%s%s.tar' % (image, torrentsNr), currentInstance, currentTest)
 
 with open('measurements/currentInstance.txt','r+') as current:
         lines = current.readlines()
@@ -191,6 +194,7 @@ with open('measurements/currentInstance.txt','r+') as current:
 
 currentTest = datetime.strftime(datetime.now(),'%Y%m%d%H%M')
 subprocess.call(['mkdir measurements/%s/%s/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
+subprocess.call(['mkdir measurements/%s/%s/loadTime/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 subprocess.call(['mkdir measurements/%s/%s/results/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 #subprocess.call(['mkdir measurements/%s/%s/results/time/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 subprocess.call(['mkdir measurements/%s/%s/0/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
