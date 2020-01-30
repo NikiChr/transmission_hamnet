@@ -53,8 +53,6 @@ def check():
     print ('%s container(s) not running babeld: %s' % (str(sumB),babeld))
     print ('%s container(s) not running opentracker: %s' % (str(sumT),tracker))
 
-    #print ('%s babeld container not running correctly\n%s opentracker container not running correctly' % (str(sumB), str(sumT)))
-
     for node in babeld:
         if node in set.servers:
             subprocess.call(["docker exec mn.%s sh -c 'export IP=%s && docker-compose -f stack_server.yml up -d'" % (node, set.ip[set.name.index(node)])],shell=True)
@@ -68,4 +66,3 @@ def check():
         repeat = False
     else:
         repeat = True
-#check()

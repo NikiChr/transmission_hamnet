@@ -55,7 +55,6 @@ def graph2Network(G, net):
             h.cmd("sysctl -w net.ipv6.conf.default.disable_ipv6=0")
             h.cmd("sysctl -w net.ipv6.conf.lo.disable_ipv6=0")
         if v not in net:
-            #time.sleep(1)
             try:
                 net.addDocker(v, ip='%s/31' % socket.inet_ntoa(struct.pack('!I',right_ip)), dimage="transmission_dind", dcmd="dockerd-entrypoint.sh", prefixLen=31)
             except:
@@ -72,10 +71,7 @@ def graph2Network(G, net):
         if1 = (u+'-'+v)[-15:]
         if2 = (v+'-'+u)[-15:]
 
-        #try:
         net.addLink(net.get(u), net.get(v), intfName1=if1, intfName2=if2)
-        #except:
-        #    print("Unexpected error:", sys.exc_info()[0], u, v, c)
 
         if not left_ip_isset:
             print("set on host %s interface %s" % (u, if1))
@@ -83,7 +79,6 @@ def graph2Network(G, net):
         if not right_ip_isset:
             print("set on host %s interface %s" % (v, if2))
             net.get(v).setIP(socket.inet_ntoa(struct.pack('!I',right_ip)), prefixLen=31, intf=if2)
-    #print (nodeList)
     return
 
 def limitLinks(G, net, routing):
@@ -112,22 +107,13 @@ def startDocker(G, net):
     bar = IncrementalBar('Starting Containers', max = numberOfNodes)
     for node in G.nodes():
         set.restartExited()
-        #time.sleep(1)
         if net.get(node).name in set.servers:
             net.get(node).cmdPrint("sh -c 'export IP=%s && docker-compose -f stack_server.yml up -d'" % net.get(node).IP())
-            #net.get(node).cmdPrint("export IP=%s && docker-compose -f stack_server.yml up -d > log/%s/container/%s.txt" % (net.get(node).IP(), currentInstance, net.get(node).name))
-            #net.get(node).cmdPrint("export IP=%s && sh -c 'docker-compose -f stack_server.yml up -d > log/%s/container/%s.txt'" % (net.get(node).IP(), currentInstance, net.get(node).name))
         else:
             net.get(node).cmdPrint("sh -c 'export IP=%s && docker-compose -f stack_client.yml up -d'" % net.get(node).IP())
-            #net.get(node).cmdPrint("export IP=%s && docker-compose -f stack_client.yml up -d > log/%s/container/%s.txt" % (net.get(node).IP(), currentInstance, net.get(node).name))
-            #net.get(node).cmdPrint("export IP=%s && sh -c 'docker-compose -f stack_client.yml up -d > log/%s/container/%s.txt'" % (net.get(node).IP(), currentInstance, net.get(node).name))
-            #net.get(node).cmdPrint("transmission-daemon --log-debug --logfile /var/log/transmission/transmission.log --download-dir /downloads/")
         net.get(node).cmdPrint('transmission-daemon --log-debug --logfile /var/log/transmission/transmission.log --download-dir /downloads/')
-        #print net.get(node).name
         bar.next()
     bar.finish()
-
-    #RUN ulimit -u unlimited
 
 def containerInfo():
     infoIP = open('infoIP.txt', 'w+')
@@ -187,6 +173,5 @@ set.restartExited()
 CLI(net)
 net.stop()
 
-#print("hallo")
 nx.draw_kamada_kawai(G)
 plt.show()

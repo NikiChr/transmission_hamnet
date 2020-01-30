@@ -1,8 +1,7 @@
 from datetime import datetime, timedelta
+from progress.bar import Bar, IncrementalBar
 import subprocess
 import os
-#import hamnetFromGraph as hfg
-#import downloadFiles as dF
 
 edgelist = './hamnet100_renamed'
 if edgelist == './hamnet201_renamed':
@@ -18,11 +17,10 @@ elif edgelist == './hamnet100_renamed':
 else:
     seeder = ['db0uc']
     servers = ['db0uc','db0ktn']
-name = [] #db0son, db0zb, db0mio, db0drh, dl0new, db0nu, db0adb, db0bt, db0uc, dl1nux, db0ktn, db0rom, db0ren, db0taw, db0fhc
+name = []
 ip = []
 global nrTorrents
 FNULL = open(os.devnull, 'w')
-#nrTorrents = 0
 
 #Unnoetig da inzwischen auch auf Images
 def chooseFile():
@@ -91,7 +89,6 @@ def useDownload():
         else:
             print 'Wrong input \n'
             check = False
-        #print "%r" % (check) + evaluate
     if evaluate == 'y':
         return True
     else:
@@ -103,14 +100,11 @@ def measureTime(title, bo, Instance, Test, iteration, torrentsNr):
 
     # Taking times from log files
     for node in name:
-        #for n in range(int(iteration)):
         if not node in seeder:
             with open('measurements/%s/%s/%s/time/%s.txt' % (Instance, Test, int(iteration), node)) as input:
                 lines = input.readlines()
                 milestone = 0
                 for i in range((int(torrentsNr) - int(iteration) + 1), int(torrentsNr) + 1):
-                    #print ('TorrentNr #%s Node %s' % (i, node))
-
                     for j in range(1,len(lines)):
                         if '%s%s.tar Queued for verification' % (title, i) in lines[j]: #if title + ' Queued for verification' in line:
                             time1 = lines[j]
@@ -120,27 +114,22 @@ def measureTime(title, bo, Instance, Test, iteration, torrentsNr):
                             break
                         else:
                             milestone = j + 1
-                    time1 = datetime.strptime(str(time1[1:24]), '%Y-%m-%d %H:%M:%S.%f') #2019-09-30 14:19:25.000
+                    time1 = datetime.strptime(str(time1[1:24]), '%Y-%m-%d %H:%M:%S.%f')
                     time2 = datetime.strptime(str(time2[1:24]), '%Y-%m-%d %H:%M:%S.%f')
                     tmp = time2 - time1
                     tmp = tmp.total_seconds()
-                    #print '%s - %s = %s' % (i, (int(torrentsNr) - int(iteration) + 1), i - (int(torrentsNr) - int(iteration) + 1 ))
-                    #print timeDelta
                     timeDelta[i - (int(torrentsNr) - int(iteration) + 1 )].append(str(tmp))
         else:
             for i in range(int(iteration)):
                 timeDelta[i].append('0')
-                #timeDelta[name.index(node)] = timeDelta[name.index(node)] + ', Seeder'
 
     for m in range(int(iteration)):
         timeDelta[m].sort(key=float)
     for l in range(len(name)):
         for o in range(int(iteration)):
-            #print ('#%s #%s' % (o, l))
             doc.write('%s ' % str(timeDelta[o][l]))
         doc.write('\n')
 
-    #doc.write('%s, %s\n' % (node, str(timeDelta[name.index(node)])))
     doc.close()
     if bo == True:
         print (timeDelta)
@@ -160,18 +149,12 @@ def measureTraffic(title, bo, Instance, Test, iteration):
                 with open('measurements/%s/%s/%s/traffic/%s_OUT.txt' % (Instance, Test, i, node)) as inputOUT:
                     linesIN = inputIN.readlines()
                     linesOUT = inputOUT.readlines()
-                    #print i
-                    #print node
                     if len(linesIN) > 2:
                         for j in range(2,len(linesIN)): # first two lines are headers
-                            #print j
                             tmp = linesIN[j].split() # tmp[1] = bytes
-                            #print tmp
                             bytesIN[i-1][name.index(node)] = bytesIN[i-1][name.index(node)] + int(tmp[1])
-                            #print bytesIN[i-1][name.index(node)]
                     if len(linesIN) > 2:
                         for k in range(2,len(linesOUT)):
-                            #print k
                             tmp = linesOUT[k].split() # tmp[1] = bytes
                             bytesOUT[i-1][name.index(node)] = bytesOUT[i-1][name.index(node)] + int(tmp[1])
 
@@ -191,36 +174,81 @@ def measureTraffic(title, bo, Instance, Test, iteration):
         print (bytesIN)
         print (bytesOUT)
 
+def imageTime(image, torrent, currentInstance, currentTest):
+    time = []
+    complete = [False] * len(name)
+    print ('%s %s' % (len(complete), len(name)))
+    sumImage = 0
+    bar = IncrementalBar('Image laden', max = len(name))
+    doc = open('./measurements/%s/%s/results/loadTime.txt' % (currentInstance, currentTest), 'w+')
+    for node in name:
+        subprocess.call(["docker exec -it mn.%s sh -c 'rm -rf times/*'" % node],shell=True)
+        if not node in seeder:
+            subprocess.call(['docker exec mn.%s sh -c "(date +"%%Y-%%m-%%dT%%T.%%6N" > times/start.txt && docker load -i downloads/%s && date +"%%Y-%%m-%%dT%%T.%%6N" > times/end.txt)"&' % (node, torrent)],shell=True)
+        else:
+            complete[name.index(node)] = True
+            sumImage = sumImage + 1
+            bar.next()
+            print '%s fertig' % node
+    while sumImage < len(name):
+        for node in name:
+            if complete[name.index(node)] == False:
+                if image in subprocess.check_output(['docker exec mn.%s docker image ls' % node],shell=True):
+                    sumImage = sumImage + 1
+                    complete[name.index(node)] = True
+                    bar.next()
+                    print '%s fertig' % node
+                else:
+                    if not image in subprocess.check_output(['docker exec mn.%s sh -c "ps -a"' % node],shell=True):
+                        subprocess.call(['docker exec mn.%s sh -c "(docker load -i downloads/%s && date +"%%Y-%%m-%%dT%%T.%%6N" > times/end.txt)"&' % (node, torrent)],shell=True)
+                        print ('Docker load restarted for mn.%s' % node)
+    bar.finish()
+    for node in name:
+        if not node in seeder:
+            subprocess.call(['docker cp mn.%s:times/start.txt measurements/%s/%s/loadTime/%s_start.txt' % (node, currentInstance, currentTest, node)],shell=True)
+            subprocess.call(['docker cp mn.%s:times/end.txt measurements/%s/%s/loadTime/%s_end.txt' % (node, currentInstance, currentTest, node)],shell=True)
+            with open('./measurements/%s/%s/loadTime/%s_start.txt' % (currentInstance, currentTest, node)) as start:
+                with open('./measurements/%s/%s/loadTime/%s_end.txt' % (currentInstance, currentTest, node)) as end:
+                    lines1 = start.readlines()
+                    lines2 = end.readlines()
+                    #for line in lines:
+                    time1 = lines1[0]
+                    time2 = lines2[0]
+                    time1 = datetime.strptime(time1[:23], '%Y-%m-%dT%H:%M:%S.%f') #2019-09-30 14:19:25.000
+                    time2 = datetime.strptime(time2[:23], '%Y-%m-%dT%H:%M:%S.%f')
+                    tmp = time2 - time1
+                    tmp = tmp.total_seconds()
+            time.append(str(tmp))
+        else:
+            time.append('0')
+    time.sort(key=float)
+    for o in range(len(name)):
+        doc.write('%s\n' % str(time[o]))
+    doc.close()
+    print 'image time complete'
+
+
 def findInterfaces():
     for node in name:
         interfaces = []
-        #print node
         doc = open('./interfaces/%s.txt' % (node), 'w+')
         with open(edgelist) as input:
             lines = input.readlines()
             for line in lines:
-                #print line
                 if '%s ' % node in line:
                     tmp = line[:line.find(' {')]
-                    #print tmp
                     nodes = tmp.split()
                     if tmp.startswith('%s ' % node) == True:
                         interfaces.append('%s-%s' % (node, nodes[1]))
-                        #print tmp
                     else:
                         interfaces.append('%s-%s' % (node, nodes[0]))
-                        #print tmp
 
         for i in range(len(interfaces)):
             if not i == len(interfaces) - 1:
                 doc.write('%s\n' % interfaces[i])
             else:
                 doc.write(interfaces[i])
-        doc.close
-
-#def setupIptables():
-    #for node in name:
-
+        doc.close()
 
 def readNodes():
     global name
@@ -279,7 +307,6 @@ def restartExited():
             print ('%s was restarted' % tmp[-1])
 
 def __init__():
-    #readNodes()
     checkNetwork()
     global nrTorrents
     nrTorrents = 0

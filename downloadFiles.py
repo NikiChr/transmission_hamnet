@@ -31,21 +31,13 @@ def checkTransmissionContainer():
     print ('\nTracker(s) running\n')
 
 def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
-    #print '1'
-
     for node in set.name:
         subprocess.call(['docker cp mn.%s:var/log/transmission/transmission.log measurements/%s/%s/0/time/%s.txt&' % (node, currentInstance, currentTest, node)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
-    #subprocess.call(['rm -fR measurements/%s/%s/0/time/*' % (currentInstance,currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True) #root/.small-dragonfly/logs/*
 
     image = image.strip()
 
     milestone = [0] * len(set.name)
     for iteration in range(int(iterations)):
-
-
-        #Tracker Restart
-        #for node in set.servers:
-            #subprocess.call(['docker exec mn.%s docker restart opentracker' % (node)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
         print ('\n###\nTest #%s\n###' % (iteration + 1))
         iStart = datetime.now()
         print iStart
@@ -65,7 +57,6 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
 
         #delete existing file and log files on hosts
         sum = 0
-        #deleted = [False] * len(set.name)
         seederPrep = [False] * len(set.seeder)
         complete = [False] * len(set.name)
         bar_restart = IncrementalBar('Deleting existing files ', max = len(set.name))
@@ -81,36 +72,23 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
             subprocess.call(["docker exec -it mn.%s sh -c 'rm -rf root/.config/transmission-daemon/torrents/*'" % node],stdout=FNULL, stderr=subprocess.STDOUT,shell=True) #root/.small-dragonfly/logs/*
             subprocess.call(["docker exec mn.%s sh -c 'iptables -Z'" % node ],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             bar_restart.next()
-
-        #print ''
+        bar_restart.finish()
         check.check()
         while check.repeat == True:
             check.check()
-
-        bar_restart.finish()
         print ('%s deleted on every host' % image)
 
-
-
         #Prepare seeder
-        #bar2 = IncrementalBar('Prepare seeder(s)', max = len(set.seeder))
         for node in set.seeder:
             if iteration == 0:
                 subprocess.call(['docker exec mn.%s docker pull %s' %(node, image)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             subprocess.call(['docker exec mn.%s docker save -o downloads/%s%s.tar %s' %(node, image, torrentsNr, image)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             subprocess.call(["'docker exec mn.%s sh -c 'iptables -Z'" % node ],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 
-            #bar2.next()
-        #time.sleep(1)
-        #bar2.finish()
-
-
-
         #Creating torrent and sharing torrent
         bar_sharing = IncrementalBar('Creating and sharing torrent', max = len(set.name))
         trackerAdr = ''
         for node in set.servers:
-            #trackerAdr = trackerAdr + ' -t udp://' + set.ip[set.name.index(node)] + ':6969'
             trackerAdr = '%s -t udp://%s:6969' % (trackerAdr, set.ip[set.name.index(node)])
 
         subprocess.call(['docker exec mn.%s transmission-create -o torrents/%s%s.torrent%s downloads/%s%s.tar' % (set.seeder[0], image, torrentsNr, trackerAdr, image, torrentsNr)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
@@ -119,8 +97,6 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
             subprocess.call(['docker cp measurements/%s/%s/torrents/%s%s.torrent mn.%s:torrents/%s%s.torrent' % (currentInstance, currentTest, image, torrentsNr, node, image, torrentsNr)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             bar_sharing.next()
         bar_sharing.finish()
-
-
 
         #Start download
         print datetime.now()
@@ -149,18 +125,14 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
                         subprocess.call(['docker cp mn.%s:var/log/transmission/transmission.log measurements/%s/%s/%s/time/%s.txt' % (node, currentInstance, currentTest, (iteration + 1), node)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
                         with open('measurements/%s/%s/%s/time/%s.txt' % (currentInstance, currentTest, (iteration + 1), node)) as tmp:
                             lines = tmp.readlines()
-                            #print
                             for i in range(milestone[set.name.index(node)],len(lines)):
                                 if '%s%s.tar State changed from "Incomplete" to "Complete"' % (image, torrentsNr) in lines[i]:
-                                #if not image + str(torrentsNr) + '.part' in subprocess.check_output(['docker exec mn.%s ls downloads/' % node],shell=True):
                                     sum = sum + 1
                                     complete[set.name.index(node)] = True
                                     milestone[set.name.index(node)] = i + 1
                                     bar_download.next()
                                     break
-                                #subprocess.call(['docker cp mn.%s:var/log/transmission/transmission.log measurements/%s/%s/%s/time/%s.txt&' % (node, currentInstance, currentTest, iteration, node)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 
-        #time.sleep(1)
         bar_download.finish()
         print 'Download(s) successful'
         print 'Grabbing data after download(s)'
@@ -172,11 +144,6 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
             subprocess.call(["docker exec mn.%s sh -c 'iptables -L FORWARD -n -v -x > tmp_OUT.txt'" % node ],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             subprocess.call(['docker cp mn.%s:tmp_OUT.txt measurements/%s/%s/%s/traffic/%s_FOR.txt' % (node, currentInstance, currentTest, (iteration + 1), node)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 
-        # if outage == True:
-        #     time.sleep(int(oTime))
-        #     for i in range(int(oNr)):
-        #         subprocess.call(['docker exec mn.%s docker start opentracker' % (set.servers[i])],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
-
     subprocess.call(['docker cp mn.%s:downloads/%s%s.tar measurements/%s/%s/results/%s%s.tar' % (set.seeder[0], image, torrentsNr, currentInstance, currentTest, image, torrentsNr)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
     set.measureTime(image, False, currentInstance, currentTest, iterations, torrentsNr)
     set.measureTraffic(image, False, currentInstance, currentTest, iterations)
@@ -184,19 +151,16 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
     doc = open('./measurements/%s/%s/results/setup.txt' % (currentInstance, currentTest), 'w+')
     doc.write('Server:%s\nHosts:%s\nSeeders:%s\nImage:%s\nServer outage:%s\nOutage number:%s\nOutage start:%s' % (str(len(set.servers)), str(len(set.name)), str(len(set.seeder)), image, outage, oNr, oTime))
     doc.close()
-
     set.imageTime(image, '%s%s.tar' % (image, torrentsNr), currentInstance, currentTest)
 
 with open('measurements/currentInstance.txt','r+') as current:
         lines = current.readlines()
         currentInstance = str(lines[-1])
-            #print torrentsNr
 
 currentTest = datetime.strftime(datetime.now(),'%Y%m%d%H%M')
 subprocess.call(['mkdir measurements/%s/%s/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 subprocess.call(['mkdir measurements/%s/%s/loadTime/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 subprocess.call(['mkdir measurements/%s/%s/results/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
-#subprocess.call(['mkdir measurements/%s/%s/results/time/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 subprocess.call(['mkdir measurements/%s/%s/0/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 subprocess.call(['mkdir measurements/%s/%s/0/time/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 subprocess.call(['mkdir measurements/%s/%s/torrents/' % (currentInstance, currentTest)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
@@ -210,16 +174,6 @@ if serverOutage == True:
     outageNr = outageNr.strip()
     outageTime = raw_input("Please enter time in seconds when server(s) shut(s) down: ")
     outageTime = outageTime.strip()
-#testNumber = raw_input("Please enter number of tests: ")
 downloadFile(testImage, set.testIterations(), serverOutage, outageNr, outageTime)
 
-#print set.testIterations()
-
 print ('Output in: measurements/%s/%s/' % (currentInstance, currentTest))
-#if set.useDownload() == True:
-    #set.measureTime(testImage,True)
-#else:
-    #print 'Results are discarded'
-#os.path.getctime(path)
-#print set.name
-#print ip
