@@ -84,6 +84,7 @@ def downloadFile(image, iterations, outage = False, oNr = 0, oTime = 0):
                 subprocess.call(['docker exec mn.%s docker pull %s' %(node, image)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             subprocess.call(['docker exec mn.%s docker save -o downloads/%s%s.tar %s' %(node, image, torrentsNr, image)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
             subprocess.call(["'docker exec mn.%s sh -c 'iptables -Z'" % node ],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
+            subprocess.call(['docker exec mn.%s transmission-remote -a torrents/%s%s.torrent &' % (node, image, torrentsNr)],stdout=FNULL, stderr=subprocess.STDOUT,shell=True)
 
         #Creating torrent and sharing torrent
         bar_sharing = IncrementalBar('Creating and sharing torrent', max = len(set.name))
